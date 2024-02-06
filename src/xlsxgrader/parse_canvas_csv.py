@@ -29,9 +29,9 @@ def parse_canvas_csv(csv_file_path : str | Path):
     # extract the grade columns
     grade_columns = data.columns[num_informational_columns_start+1:-num_informational_columns_end:2]
 
-    # extract the questions and the answers
-    responses = data[response_columns]
-    grades = data[grade_columns]
+    # extract the questions and the answers; copy the data to a new dataframe
+    responses = data[response_columns].copy()
+    grades = data[grade_columns].copy()
 
     # determine which questions need to be graded by checking if all the scores are 0
     grade_columns_that_sum_to_zero = data[grade_columns].sum() == 0
@@ -63,6 +63,24 @@ def parse_canvas_csv(csv_file_path : str | Path):
     # make a pandas dataframe for the question text
     question_text_df = pd.DataFrame(question_text, index=new_column_names, columns=['Question Text']).T
 
+    # parse the last name and first name from the index
+    last_names = [name.split(' ')[-1] for name in data.index]
+    first_names = [' '.join(name.split(' ')[:-1]) for name in data.index]
+
+    # add last name and first name columns to grades and responses
+    grades.loc[:,'Last Name'] = last_names
+    grades.loc[:,'First Name'] = first_names
+    responses.loc[:,'Last Name'] = last_names
+    responses.loc[:,'First Name'] = first_names
+
+    # make last name and first name the first two columns
+    grades = grades[['Last Name', 'First Name'] + list(grades.columns[:-2])]
+    responses['Last Name'] = last_names
+    
+    # sort the dataframes by last name
+    grades = grades.sort_values(by='Last Name')
+    responses = responses.sort_values(by='Last Name')
+
     # collect the question data into a dictionary
     question_data = {
         'question_text': question_text_df,
@@ -79,6 +97,10 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
 
     # set the worksheet names
     worksheet_names = ["Total Scores"] + list(question_data['responses'].columns)
+
+    # remove Last Name and First Name from the list of worksheet names
+    worksheet_names.remove('Last Name')
+    worksheet_names.remove('First Name')
 
     # create a new workbook
     wb = openpyxl.Workbook()
@@ -136,13 +158,16 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
     # create the total scores worksheet from scratch
     ws1 = wb[worksheet_names[0]]
     ws1.append([]) # add an empty row so that this sheet matches the others
-    columns = ['Student Name', 'Total Score', 'Comments']
+    columns = ['Full Student Name', 'Last Name', 'First Name', 'Total Score', 'Comments']
     ws1.append(columns)
     # make the first row bold
     for cell in ws1[2]:
         cell.font = openpyxl.styles.Font(bold=True)
     # set the current row
     start_row = 3
+
+    current_color = "FFFFFF"
+
     # populate the rows
     for n, row in enumerate(question_data['responses'].iterrows()):
         # set the current row
@@ -151,9 +176,15 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
         # name
         new_row = [row[0]]
 
+        # last name
+        new_row.append(row[1]['Last Name'])
+        
+        # first name
+        new_row.append(row[1]['First Name'])
+
         # total score (use formulas to connect to the data in the other sheets)
-        total_score_formula = f"=SUM("
-        for question in question_data['responses'].columns:
+        total_score_formula = "=SUM("
+        for question in worksheet_names[1:]:
             total_score_formula += f"'{question}'!C{current_row},"
         total_score_formula = total_score_formula[:-1] + ")"
         # total score
@@ -162,17 +193,17 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
         # comments
         # use a formula to construct the comments in the following format:
         # "Question 1 (score/max score): comments; Question 2 (score/max score): comments; ..."
-        comment_formula = f"=CONCATENATE("
+        comment_formula = "=CONCATENATE("
 
         for n, question in enumerate(question_data['responses_to_grade']):
             item = f'"{question} (",'
             item += f"'{question}'!C{current_row},"
             item += '"/",'
             item += f"'{question}'!D{current_row}"
-            item += ',"): ",'
+            item += ',") ",'
             item += f"'{question}'!E{current_row}"
             if n < len(question_data['responses_to_grade']) - 1:
-                item += ',"; ",'
+                item += ',CHAR(10),"|",CHAR(10),'
             else:
                 item += ')'
             comment_formula += item
@@ -180,6 +211,16 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
 
         # append the row
         ws1.append(new_row)
+
+        # set the color of the row
+        for cell in ws1[current_row]:
+            cell.fill = openpyxl.styles.PatternFill(start_color=current_color, end_color=current_color, fill_type="solid")
+
+        # alternate the color
+        if current_color == "FFFFFF":
+            current_color = "DDDDDD"
+        elif current_color == "DDDDDD":
+            current_color = "FFFFFF"
         
         # increment the current row
         current_row += 1
@@ -189,22 +230,29 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
         cell.font = openpyxl.styles.Font(bold=True)
     
     # auto set the name column width
-    ws1.column_dimensions['A'].auto_size = True
+    ws1.column_dimensions['A'].width = 15
 
-    # set the width of the second column
-    ws1.column_dimensions['B'].width = 15
+    # set the width of the grade column
+    ws1.column_dimensions['D'].width = 15
 
-    # set the width of the third column
-    ws1.column_dimensions['C'].width = 50
+    # set the width of the comment column
+    ws1.column_dimensions['E'].width = 50
 
-    for cell in ws1['B']:
+    for cell in ws1['D']:
         # use center justification for the total score column
         cell.alignment = openpyxl.styles.Alignment(horizontal='center')
         # format the total score column to round to the first decimal place
         cell.number_format = '0.0'
 
-    # put the maximum score in cell B1
-    ws1['B1'] = f"Max Score: {sum(question_data['max_grades'].values[0])}"
+    # put the maximum score in cell D1
+    ws1['D1'] = f"Max Score: {sum(question_data['max_grades'].values[0])}"
+
+    # freeze column A
+    ws1.freeze_panes = ws1['B1']
+
+    # hide columns B and C
+    ws1.column_dimensions['B'].hidden = True
+    ws1.column_dimensions['C'].hidden = True
 
     # get the first question to be graded
     first_question_to_grade = str(question_data['responses_to_grade'][0])
