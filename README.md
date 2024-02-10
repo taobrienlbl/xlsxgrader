@@ -4,7 +4,7 @@ Converts exported CSV files to an xlsx format suitable for rapid grading and gra
 
 # Install
 
-`pip install https://github.com/taobrienlbl/xlsxgrader.git`
+`pip install git+https://github.com/taobrienlbl/xlsxgrader.git`
 
 # Usage
 
