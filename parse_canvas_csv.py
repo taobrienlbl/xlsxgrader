@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+import openpyxl
 
 def parse_canvas_csv(csv_file_path : str | Path):
     """ Parse a CSV file exported from Canvas and return a cleaned-up DataFrame. """
@@ -72,3 +73,155 @@ def parse_canvas_csv(csv_file_path : str | Path):
     }
 
     return question_data
+
+def save_to_excel(question_data, excel_file_path : str | Path):
+    """ Save the question data to an Excel file. """
+
+    # set the worksheet names
+    worksheet_names = ["Total Scores"] + list(question_data['responses'].columns)
+
+    # create a new workbook
+    wb = openpyxl.Workbook()
+
+    # rename the first sheet
+    wb.active.title = worksheet_names[0]
+
+    # create the worksheets
+    for sheet_name in worksheet_names[1:]:
+        wb.create_sheet(sheet_name)
+
+    # insert the question/response data into the question worksheets
+    for sheet_name in worksheet_names[1:]:
+        ws = wb[sheet_name]
+        # set cell C1 to the question text for each question worksheet
+        ws['C1'] = question_data['question_text'][sheet_name].values[0]
+        ws.append(['Student Name', 'Response', "Score", "Max Score", "Comments"])
+        # make the first row italic
+        for cell in ws[1]:
+            cell.font = openpyxl.styles.Font(italic=True)
+        # make the second row bold
+        for cell in ws[2]:
+            cell.font = openpyxl.styles.Font(bold=True)
+        # iterate over the rows in the responses dataframe and insert them into the worksheet
+        for row, grade_row in zip(question_data['responses'].iterrows(), question_data['grades'].iterrows()):
+            # name
+            new_row = [row[0]]
+            # response
+            new_row.append(row[1][sheet_name])
+            # score
+            new_row.append(grade_row[1][sheet_name])
+            # max score
+            new_row.append(question_data['max_grades'][sheet_name].values[0])
+            # comments
+            new_row.append('')
+            ws.append(new_row)
+
+        # set the width of the second column and turn on text wrapping
+        ws.column_dimensions['B'].width = 50
+        ws.column_dimensions['B'].bestFit = True
+        ws.column_dimensions['B'].auto_size = True
+
+        # set row heights based on column B
+        for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=2, max_col=2):
+            for cell in row:
+                cell.alignment = openpyxl.styles.Alignment(wrap_text=True)
+
+        # freeze rows 1 and 2
+        ws.freeze_panes = ws['A3']
+
+        # hide column A
+        ws.column_dimensions['A'].hidden = True
+
+
+    # create the total scores worksheet from scratch
+    ws1 = wb[worksheet_names[0]]
+    ws1.append([]) # add an empty row so that this sheet matches the others
+    columns = ['Student Name', 'Total Score', 'Comments']
+    ws1.append(columns)
+    # make the first row bold
+    for cell in ws1[2]:
+        cell.font = openpyxl.styles.Font(bold=True)
+    # set the current row
+    start_row = 3
+    # populate the rows
+    for n, row in enumerate(question_data['responses'].iterrows()):
+        # set the current row
+        current_row = start_row + n
+
+        # name
+        new_row = [row[0]]
+
+        # total score (use formulas to connect to the data in the other sheets)
+        total_score_formula = f"=SUM("
+        for question in question_data['responses'].columns:
+            total_score_formula += f"'{question}'!C{current_row},"
+        total_score_formula = total_score_formula[:-1] + ")"
+        # total score
+        new_row.append(total_score_formula)
+
+        # comments
+        # use a formula to construct the comments in the following format:
+        # "Question 1 (score/max score): comments; Question 2 (score/max score): comments; ..."
+        comment_formula = f"=CONCATENATE("
+
+        for n, question in enumerate(question_data['responses_to_grade']):
+            item = f'"{question} (",'
+            item += f"'{question}'!C{current_row},"
+            item += '"/",'
+            item += f"'{question}'!D{current_row}"
+            item += ',"): ",'
+            item += f"'{question}'!E{current_row}"
+            if n < len(question_data['responses_to_grade']) - 1:
+                item += ',"; ",'
+            else:
+                item += ')'
+            comment_formula += item
+        new_row.append(comment_formula)
+
+        # append the row
+        ws1.append(new_row)
+        
+        # increment the current row
+        current_row += 1
+    
+    # make the student name column bold
+    for cell in ws1['A']:
+        cell.font = openpyxl.styles.Font(bold=True)
+    
+    # auto set the name column width
+    ws1.column_dimensions['A'].auto_size = True
+
+    # set the width of the second column
+    ws1.column_dimensions['B'].width = 15
+
+    # set the width of the third column
+    ws1.column_dimensions['C'].width = 50
+
+    for cell in ws1['B']:
+        # use center justification for the total score column
+        cell.alignment = openpyxl.styles.Alignment(horizontal='center')
+        # format the total score column to round to the first decimal place
+        cell.number_format = '0.0'
+
+    # put the maximum score in cell B2
+    ws1['B2'] = f"Max Score: {sum(question_data['max_grades'].values[0])}"
+
+    # get the first question to be graded
+    first_question_to_grade = str(question_data['responses_to_grade'][0])
+
+    # set the active worksheet to be the first question that needs to be graded
+    wb.active = wb[first_question_to_grade]
+
+    # save the excel file
+    wb.save(excel_file_path)
+
+    return
+
+if __name__ == "__main__":
+    # load the CSV file
+    csv_file_path = './Week 2 _ ASSIGNMENT_ Pressure and the Structure of the Atmosphere Quiz Student Analysis Report.csv'
+    question_data = parse_canvas_csv(csv_file_path)
+
+    # save the data to an Excel file
+    excel_file_path = 'test.xlsx'
+    save_to_excel(question_data, excel_file_path)
