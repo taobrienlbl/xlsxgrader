@@ -203,8 +203,8 @@ def save_to_xlsx(question_data, xlsx_file_path : str | Path):
         # format the total score column to round to the first decimal place
         cell.number_format = '0.0'
 
-    # put the maximum score in cell B2
-    ws1['B2'] = f"Max Score: {sum(question_data['max_grades'].values[0])}"
+    # put the maximum score in cell B1
+    ws1['B1'] = f"Max Score: {sum(question_data['max_grades'].values[0])}"
 
     # get the first question to be graded
     first_question_to_grade = str(question_data['responses_to_grade'][0])

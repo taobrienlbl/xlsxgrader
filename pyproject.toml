@@ -2,6 +2,7 @@
 requires = ["setuptools", "wheel"]
 
 [project]
+requires-python = ">=3.8"
 name = "xlsxgrader"
 version = "0.1.0"
 description = "Generates an xlsx file suitable for grading, using an exported csv file as input"
@@ -9,7 +10,10 @@ authors = [
     { name = "Travis A. O'Brien", email = "obrienta@iu.edu" }
 ]
 readme = "README.md"
-dependencies = ["pandas", "openpyxl"]
+dependencies = ["pandas", "openpyxl", "tk", "tkinterdnd2"]
 
 [project.scripts]
-xlsxgrader = 'xlsxgrader:main'
+xlsxgrader = 'xlsxgrader:main_cli'
+
+#[project.gui-scripts]
+#xlsxgradergui = 'xlsxgrader:main_gui'
