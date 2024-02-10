@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "xlsxgrader"
+version = "0.1.0"
+description = "Generates an xlsx file suitable for grading, using an exported csv file as input"
+authors = [
+    { name = "Travis A. O'Brien", email = "obrienta@iu.edu" }
+]
+readme = "README.md"
+dependencies = ["pandas", "openpyxl"]
+
+[project.scripts]
+xlsxgrader = 'xlsxgrader:main'

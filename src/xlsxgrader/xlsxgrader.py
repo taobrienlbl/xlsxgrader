@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ xlsxgrader - a tool for converting assignment exports from a CSV format to an xlsx format for grading purposes. """
-import parse_canvas_csv
+import xlsxgrader.parse_canvas_csv
 import argparse
 from pathlib import Path
 
