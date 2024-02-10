@@ -74,8 +74,8 @@ def parse_canvas_csv(csv_file_path : str | Path):
 
     return question_data
 
-def save_to_excel(question_data, excel_file_path : str | Path):
-    """ Save the question data to an Excel file. """
+def save_to_xlsx(question_data, xlsx_file_path : str | Path):
+    """ Save the question data to an xlsx file. """
 
     # set the worksheet names
     worksheet_names = ["Total Scores"] + list(question_data['responses'].columns)
@@ -212,16 +212,7 @@ def save_to_excel(question_data, excel_file_path : str | Path):
     # set the active worksheet to be the first question that needs to be graded
     wb.active = wb[first_question_to_grade]
 
-    # save the excel file
-    wb.save(excel_file_path)
+    # save the xlsx file
+    wb.save(xlsx_file_path)
 
     return
-
-if __name__ == "__main__":
-    # load the CSV file
-    csv_file_path = './Week 2 _ ASSIGNMENT_ Pressure and the Structure of the Atmosphere Quiz Student Analysis Report.csv'
-    question_data = parse_canvas_csv(csv_file_path)
-
-    # save the data to an Excel file
-    excel_file_path = 'test.xlsx'
-    save_to_excel(question_data, excel_file_path)
